@@ -1,0 +1,406 @@
+❯ sample1.cblを依存ファイルも含めて解析し、Javaへ変換するプランを立てて 
+
+⏺ Entered plan mode
+  Claude is now exploring and designing an implementation approach.
+
+⏺ Explore(Explore COBOL files structure)
+  ⎿  Done (7 tool uses · 19.2k tokens · 30s)
+  (ctrl+o to expand)
+
+⏺ COBOLファイル群の内容を十分に把握できました。次にJava変換プランを設計します。
+
+⏺ Plan(Design Java conversion plan)
+  ⎿  Done (7 tool uses · 24.1k tokens · 2m 41s)
+  (ctrl+o to expand)
+
+⏺ User answered Claude's questions:
+  ⎿  · Javaプロジェクトのビルドツールはどれを使いますか？ → なし（javac のみ）(Recommended)
+     · JUnit テストも作成しますか？ → いいえ（動作確認は main 実行のみ）(Recommended)
+
+⏺ Updated plan
+  ⎿  /plan to preview
+
+⏺ User approved Claude's plan           
+  ⎿  Plan saved to: ~/.claude/plans/sprightly-hatching-bachman.md · /plan to edit
+     COBOL → Java 変換プラン: sample1.cbl / sub1.cbl                                                                                                  
+   
+     Context                                                                                                                                          
+                                                                                                                                                    
+     sample1.cbl（メインプログラム）・sub1.cbl（サブプログラム）・copy1.cpy（コピーブック）からなる COBOL プログラム群を、等価な Java
+     コードへ変換する。
+     目的は COBOL 特有の言語機能（REDEFINES、IS EXTERNAL、MOVE CORRESPONDING、CALL USING CONTENT 等）を Java でどう表現するかを明確にすること。
+
+     ビルドツール: なし（javac のみ）
+     テスト: main() 実行で出力を目視確認
+
+     ---
+     期待される実行結果（変換後の Java を実行した際の標準出力）
+
+     WORK-AREA2: 20260102
+     YYYYMMDD: 20260302
+     HOGE-DATE: 20260302
+     EXT-WORK-DATA: EXTERNAL
+       SUB1: PARAM-DATE: 20260302
+       SUB1: EXT-WORK-DATA: EXTERNAL
+     HOGE-DATE: 20270302
+     EXT-WORK-DATA: SUB1
+     HOGE-DATE: 20260102
+       SUB1: PARAM-DATE: 20260102
+       SUB1: EXT-WORK-DATA: SUB1
+     HOGE-DATE: 20260102
+     COPY-WORK-DATA: COPY-DATA
+     BAR-STR1: FOO1
+     BAR-STR2: FOO2
+     BAR-STR3: FOO3
+     DD: 01
+
+     注意: 元ソース sample1.cbl の 000710 行は HOGE-DATA（タイポ）だが、実際の GnuCOBOL コンパイラは暗黙的に HOGE-DATE へ解決するため、Java でも
+     hogeDate を表示する。
+
+     ---
+     出力ファイル構成
+
+     src/
+     └── cobol/
+         └── sample1/
+             ├── CobolUtil.java       # ユーティリティ（move, display）
+             ├── ExternalArea.java    # IS EXTERNAL 共有領域（静的シングルトン）
+             ├── HogeDate.java        # 03 HOGE-DATE 構造体（SUB1 の PARAM-DATE も兼用）
+             ├── WorkArea1.java       # 01 WORK-AREA1（REDEFINES を char[] で実装）
+             ├── WorkArea2.java       # 01 WORK-AREA2
+             ├── CopyWorkArea1.java   # COPY1 展開: COPY-WORK-AREA1
+             ├── CopyWorkArea2.java   # COPY1 展開: COPY-WORK-AREA2（FOO→BAR 置換済み）
+             ├── Sub1.java            # SUB1 サブプログラム
+             └── Sample1.java         # SAMPLE1 メインプログラム（main() エントリ）
+     run.sh                           # コンパイル & 実行スクリプト
+
+     ---
+     COBOL → Java 言語機能マッピング
+
+     ┌─────────────────────────────────┬─────────────────────────────────────────────┐
+     │              COBOL              │                    Java                     │
+     ├─────────────────────────────────┼─────────────────────────────────────────────┤
+     │ PIC X(n)                        │ String（CobolUtil.move() で幅固定）         │
+     ├─────────────────────────────────┼─────────────────────────────────────────────┤
+     │ 01 GROUP                        │ クラス                                      │
+     ├─────────────────────────────────┼─────────────────────────────────────────────┤
+     │ REDEFINES                       │ 共有 char[] + getter/setter スライス        │
+     ├─────────────────────────────────┼─────────────────────────────────────────────┤
+     │ IS EXTERNAL                     │ ExternalArea.INSTANCE（static singleton）   │
+     ├─────────────────────────────────┼─────────────────────────────────────────────┤
+     │ CALL "SUB1" USING param         │ Sub1.call(paramDate) — オブジェクト参照渡し │
+     ├─────────────────────────────────┼─────────────────────────────────────────────┤
+     │ CALL "SUB1" USING CONTENT param │ コピーを作成してから Sub1.call(copy)        │
+     ├─────────────────────────────────┼─────────────────────────────────────────────┤
+     │ MOVE CORR A TO B                │ 同名フィールドを静的に列挙して代入          │
+     ├─────────────────────────────────┼─────────────────────────────────────────────┤
+     │ COPY copybook REPLACING         │ クラス名・フィールド名に置換適用済みで展開  │
+     ├─────────────────────────────────┼─────────────────────────────────────────────┤
+     │ DD OF HOGE-DATE OF WORK-AREA2   │ workArea2.hogeDate.getDD()                  │
+     ├─────────────────────────────────┼─────────────────────────────────────────────┤
+     │ PERFORM section                 │ section() メソッド呼び出し                  │
+     ├─────────────────────────────────┼─────────────────────────────────────────────┤
+     │ DISPLAY "text" var              │ CobolUtil.display("text", var)              │
+     ├─────────────────────────────────┼─────────────────────────────────────────────┤
+     │ STOP RUN                        │ run() から return（main() が終了）          │
+     ├─────────────────────────────────┼─────────────────────────────────────────────┤
+     │ EXIT PROGRAM                    │ call() メソッドから return                  │
+     └─────────────────────────────────┴─────────────────────────────────────────────┘
+
+     ---
+     各クラスの設計
+
+     CobolUtil.java
+
+     public static String move(String value, int width)
+     // 左詰め・右スペースパッド・width 超過は左から切捨て
+
+     public static void display(String... parts)
+     // 結合して System.out.println
+
+     ExternalArea.java
+
+     public class ExternalArea {
+         public static final ExternalArea INSTANCE = new ExternalArea();
+         private String extWorkData = "          "; // PIC X(10)
+         // getter / setter（move で幅保持）
+     }
+     Sample1・Sub1 両方が ExternalArea.INSTANCE を参照 → IS EXTERNAL の共有セマンティクスを再現。
+
+     HogeDate.java
+
+     03 HOGE-DATE（WORK-AREA2 内）と SUB1 の PARAM-DATE は同じ構造なので共通クラスとして定義。
+     private String yyyy, mm, dd;  // PIC X(4), X(2), X(2)
+     String toCobolString()          // yyyy + mm + dd
+     void fromCobolString(String s)  // 8文字からスライス
+
+     WorkArea1.java（REDEFINES の核心）
+
+     private final char[] buf = new char[8]; // YYYYMMDD と YYYYMMDD-R が共有
+
+     // YYYYMMDD: フラットビュー
+     String getYYYYMMDD() / void setYYYYMMDD(String)
+
+     // YYYYMMDD-R: 構造ビュー（同じ buf をスライス）
+     String getYYYY() / void setYYYY(String)  // buf[0..3]
+     String getMM()   / void setMM(String)    // buf[4..5]
+     String getDD()   / void setDD(String)    // buf[6..7]
+     setMM("03") 後に getYYYYMMDD() が "20260302" を返す → COBOL の REDEFINES 同等。
+
+     WorkArea2.java
+
+     public final HogeDate hogeDate = new HogeDate();
+     String toCobolString() { return hogeDate.toCobolString(); }
+     void fromCobolString(String s) { hogeDate.fromCobolString(s); }
+
+     CopyWorkArea1.java / CopyWorkArea2.java
+
+     - CopyWorkArea1: copyWorkData PIC X(10)
+     - CopyWorkArea2: barStr1/2/3 PIC X(10)（元は FOO-STR1/2/3、REPLACING 適用済み）
+     クラスの Javadoc に元のコピーブック名と REPLACING 条件を記録。
+
+     Sub1.java
+
+     public static void call(HogeDate paramDate) {
+         // DISPLAY / MOVE "2027" TO YYYY / EXT-WORK-AREA 操作
+     }
+     パラメータは HogeDate オブジェクト参照。USING CONTENT の場合はコール側でコピーを渡す。
+
+     Sample1.java
+
+     public class Sample1 {
+         private final WorkArea1     workArea1    = new WorkArea1();
+         private final WorkArea2     workArea2    = new WorkArea2();
+         private final CopyWorkArea1 copyWorkArea1 = new CopyWorkArea1();
+         private final CopyWorkArea2 copyWorkArea2 = new CopyWorkArea2();
+         private static final ExternalArea extWorkArea = ExternalArea.INSTANCE;
+
+         public void run() { moveGrpSec(); redefinesSec(); moveCorrSec(); callSec(); copySec(); ... }
+         private void moveGrpSec()   { ... }
+         private void redefinesSec() { ... }
+         private void moveCorrSec()  { // MOVE CORR: 3フィールドを静的列挙でコピー }
+         private void callSec()      {
+             // by-reference: Sub1.call(workArea2.hogeDate)
+             // by-value:     HogeDate copy = ...; Sub1.call(copy);
+         }
+         private void copySec()      { ... }
+
+         public static void main(String[] args) { new Sample1().run(); }
+     }
+
+     ---
+     実装順序
+
+     1. CobolUtil.java — 依存なし。move() と display() を実装
+     2. ExternalArea.java — CobolUtil のみ依存
+     3. HogeDate.java — CobolUtil のみ依存
+     4. WorkArea1.java — char[] バッキングストアで REDEFINES 実装
+     5. WorkArea2.java — HogeDate に依存
+     6. CopyWorkArea1.java / CopyWorkArea2.java — 独立
+     7. Sub1.java — HogeDate, ExternalArea, CobolUtil に依存
+     8. Sample1.java — 全クラスに依存
+     9. run.sh — javac + java を実行するスクリプト
+
+     ---
+     検証方法
+
+     bash run.sh
+
+     標準出力と「期待される実行結果」セクションを行ごとに照合する。
+     特に以下のポイントを確認:
+     - YYYYMMDD: 20260302（REDEFINES 経由で MM を書き換えた結果が反映される）
+     - HOGE-DATE: 20270302（SUB1 が YYYY を "2027" に変更 → 参照渡しで反映）
+     - 2回目の CALL 後は HOGE-DATE: 20260102（値渡しのため変更なし）
+     - EXT-WORK-DATA: SUB1（IS EXTERNAL 経由で共有）
+
+⏺ プランが承認されました。実装を開始します。       
+
+⏺ Bash(mkdir -p /Users/learn/workspace/cobol-example/src/cobol/sample1)                                                                               
+  ⎿  Done                   
+                                                                                                                                                      
+⏺ Write(src/cobol/sample1/CobolUtil.java)                                                                                                             
+  ⎿  Wrote 32 lines to src/cobol/sample1/CobolUtil.java                                                                                               
+      1 package cobol.sample1;                                                                                                                        
+      2                                                                                                                                               
+      3 /**                                                                                                                                           
+      4  * COBOL ユーティリティ。                                                                                                                     
+      5  * PIC X(n) の固定幅文字列操作と DISPLAY 命令を提供する。                                                                                     
+      6  */                                                                                                                                           
+      7 public final class CobolUtil {                                                                                                                
+      8                                                                                                                                               
+      9     private CobolUtil() {}                                                                                                                    
+     … +22 lines (ctrl+o to expand)
+                                                                                                                                                      
+⏺ Write(src/cobol/sample1/ExternalArea.java)                                       
+  ⎿  Wrote 30 lines to src/cobol/sample1/ExternalArea.java
+       1 package cobol.sample1;
+       2                   
+       3 /**                
+       4  * COBOL の IS EXTERNAL データ領域を表す静的シングルトン。
+       5  *            
+       6  * SAMPLE1 と SUB1 の両プログラムが同一インスタンスを参照することで、
+       7  * COBOL の IS EXTERNAL による共有セマンティクスを再現する。
+       8  *
+       9  * COBOL 元定義:                                                                                                                             
+      10  *   01 EXT-WORK-AREA IS EXTERNAL.
+     … +20 lines (ctrl+o to expand)                                                                                                                   
+                                                                                   
+⏺ Write(src/cobol/sample1/HogeDate.java)                          
+  ⎿  Wrote 51 lines to src/cobol/sample1/HogeDate.java
+       1 package cobol.sample1;                              
+       2                    
+       3 /**                   
+       4  * COBOL の日付グループ項目を表す。           
+       5  *                 
+       6  * SAMPLE1 の 03 HOGE-DATE（01 WORK-AREA2 内）と
+       7  * SUB1 の 01 PARAM-DATE（LINKAGE SECTION）は同一構造のため共通クラスとして定義。
+       8  *               
+       9  * COBOL 元定義:                                                                                                                             
+      10  *   03 HOGE-DATE.
+     … +41 lines (ctrl+o to expand)                                                                                                                   
+                                                                                   
+⏺ Write(src/cobol/sample1/WorkArea1.java)                                                                                                             
+  ⎿  Wrote 91 lines to src/cobol/sample1/WorkArea1.java                            
+       1 package cobol.sample1;
+       2                   
+       3 /**                
+       4  * COBOL の 01 WORK-AREA1 を表す。            
+       5  *            
+       6  * YYYYMMDD（PIC X(8)）と YYYYMMDD-R（REDEFINES YYYYMMDD）が同じメモリを共有する
+       7  * REDEFINES 構造を、8要素の char[] バッキングストアで再現する。
+       8  * どちらのビューからの書き込みも同じ buf[] に反映される。
+       9  *                                                                                                                                           
+      10  * COBOL 元定義:
+     … +81 lines (ctrl+o to expand)                                                                                                                   
+                                                                                   
+⏺ Write(src/cobol/sample1/WorkArea2.java)                      
+  ⎿  Wrote 27 lines to src/cobol/sample1/WorkArea2.java
+       1 package cobol.sample1;                             
+       2                    
+       3 /**                   
+       4  * COBOL の 01 WORK-AREA2 を表す。            
+       5  *                 
+       6  * COBOL 元定義:                              
+       7  *   01 WORK-AREA2.    
+       8  *     03 HOGE-DATE.
+       9  *       05 YYYY PIC X(4).                                                                                                                   
+      10  *       05 MM   PIC X(2).
+     … +17 lines (ctrl+o to expand)                                                                                                                   
+                                                                                   
+⏺ Write(src/cobol/sample1/CopyWorkArea1.java)                                                                                                         
+  ⎿  Wrote 22 lines to src/cobol/sample1/CopyWorkArea1.java                        
+       1 package cobol.sample1;
+       2                   
+       3 /**                
+       4  * COPY "COPY1" の展開: 01 COPY-WORK-AREA1。  
+       5  *            
+       6  * COBOL 元定義（copy1.cpy）:
+       7  *   01 COPY-WORK-AREA1.
+       8  *     03 COPY-WORK-DATA PIC X(10).
+       9  */                                                                                                                                          
+      10 public class CopyWorkArea1 {
+     … +12 lines (ctrl+o to expand)                                                                                                                   
+                                                                                   
+⏺ Write(src/cobol/sample1/CopyWorkArea2.java)               
+  ⎿  Wrote 32 lines to src/cobol/sample1/CopyWorkArea2.java
+       1 package cobol.sample1;                             
+       2                    
+       3 /**                   
+       4  * COPY "COPY1" REPLACING LEADING ==FOO== BY ==BAR== の展開: 01 COPY-WORK-AREA2。
+       5  *                 
+       6  * COBOL 元定義（copy1.cpy）では FOO-STR1/2/3 だが、
+       7  * REPLACING 句により BAR-STR1/2/3 に置換されている。
+       8  *               
+       9  * COBOL 元定義（copy1.cpy）:                                                                                                                
+      10  *   01 COPY-WORK-AREA2.
+     … +22 lines (ctrl+o to expand)                                                                                                                   
+                                                                                   
+⏺ Write(src/cobol/sample1/Sub1.java)                                                                                                                  
+  ⎿  Wrote 48 lines to src/cobol/sample1/Sub1.java                                 
+       1 package cobol.sample1;                           
+       2                    
+       3 /**                   
+       4  * COBOL サブプログラム SUB1 に相当するクラス。
+       5  *                 
+       6  * COBOL 元定義（sub1.cbl）:                  
+       7  *   PROGRAM-ID. SUB1. 
+       8  *   WORKING-STORAGE SECTION.
+       9  *     01 EXT-WORK-AREA IS EXTERNAL.                                                                                                         
+      10  *       03 EXT-WORK-DATA PIC X(10).
+     … +38 lines (ctrl+o to expand)                                                                                                                   
+                                                                                   
+⏺ Write(src/cobol/sample1/Sample1.java)                                                                                                               
+  ⎿  Wrote 178 lines to src/cobol/sample1/Sample1.java                             
+       1 package cobol.sample1;
+       2                   
+       3 /**                
+       4  * COBOL メインプログラム SAMPLE1 に相当するクラス。
+       5  *            
+       6  * 各 COBOL SECTION を private メソッドとして実装し、
+       7  * PERFORM 文の呼び出し順序を run() メソッドで再現する。
+       8  *
+       9  * COBOL 元定義（sample1.cbl）:                                                                                                              
+      10  *   PROGRAM-ID. SAMPLE1.
+     … +168 lines (ctrl+o to expand)                                                                                                                  
+                                                                                   
+⏺ Write(run.sh)                                              
+  ⎿  Wrote 21 lines to run.sh
+       1 #!/bin/bash           
+       2 set -e            
+       3                    
+       4 SRC=src                                       
+       5 OUT=out       
+       6                  
+       7 # コンパイル           
+       8 mkdir -p "$OUT"
+       9 javac -d "$OUT" \                                                                                                                            
+      10   "$SRC/cobol/sample1/CobolUtil.java" \
+     … +11 lines (ctrl+o to expand)                                                                                                                   
+                                                                                   
+⏺ Bash(bash run.sh)                                          
+  ⎿  WORK-AREA2: 20260102   
+     YYYYMMDD: 20260302        
+     HOGE-DATE: 20260302                          
+     … +14 lines (ctrl+o to expand)
+                                                       
+⏺ プランに記載した期待出力と完全一致しました。                    
+                            
+⏺ 全ファイルの作成と動作確認が完了しました。                      
+                            
+  実装結果                                                                                                                                            
+                                                       
+  生成ファイル構成                                                                                                                                    
+                                                                                                                                                      
+  src/cobol/sample1/                                                                                                                                  
+  ├── CobolUtil.java       move() / display() ユーティリティ                                                                                          
+  ├── ExternalArea.java    IS EXTERNAL → 静的シングルトン                                                                                             
+  ├── HogeDate.java        03 HOGE-DATE / PARAM-DATE 共通構造体                                                                                       
+  ├── WorkArea1.java       REDEFINES → char[] バッキングストア                                                                                        
+  ├── WorkArea2.java       01 WORK-AREA2                                                                                                              
+  ├── CopyWorkArea1.java   COPY1 展開（COPY-WORK-AREA1）                                                                                              
+  ├── CopyWorkArea2.java   COPY1 展開・FOO→BAR 置換済み（COPY-WORK-AREA2）                                                                            
+  ├── Sub1.java            SUB1 サブプログラム
+  └── Sample1.java         SAMPLE1 メインプログラム                                                                                                   
+  run.sh                   コンパイル & 実行スクリプト                                                                                                
+                                                                                                                                                      
+  主要な COBOL → Java 変換ポイント                                                                                                                    
+
+  ┌──────────────────────────────┬──────────────────────────────────────────────────────────────────────────────────────────────┐
+  │          COBOL 機能          │                                      Java での実現方法                                       │
+  ├──────────────────────────────┼──────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ REDEFINES                    │ 8要素の char[] を共有し、フラットビュー・構造ビュー両方から getter/setter でスライスアクセス │
+  ├──────────────────────────────┼──────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ IS EXTERNAL                  │ ExternalArea.INSTANCE（static singleton）を SAMPLE1 と SUB1 が共有                           │
+  ├──────────────────────────────┼──────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ CALL USING（参照渡し）       │ HogeDate オブジェクト参照をそのまま渡す                                                      │
+  ├──────────────────────────────┼──────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ CALL USING CONTENT（値渡し） │ 呼び出し側が toCobolString()/fromCobolString() でコピーを作成してから渡す                    │
+  ├──────────────────────────────┼──────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ MOVE CORRESPONDING           │ 同名フィールドを静的に列挙して代入（YYYY/MM/DD の3フィールド）                               │
+  ├──────────────────────────────┼──────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ COPY with REPLACING          │ コンパイル時に置換適用済みのクラス名・フィールド名で展開                                     │
+  ├──────────────────────────────┼──────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ PIC X(n)                     │ CobolUtil.move() で左詰め・右スペースパッド・固定幅を保証                                    │
+  └──────────────────────────────┴──────────────────────────────────────────────────────────────────────────────────────────────┘
+
+✻ Cooked for 8m 16s
