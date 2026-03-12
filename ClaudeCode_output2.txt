@@ -1,0 +1,336 @@
+❯ sample1.cblを依存ファイルも含めて解析し、Javaへ変換するプランを立てて。以前に変換したものがsrcフォルダ配下にあるけど、その時からCOBOLファイルの内容 
+は変わっていますので参考にしてもしなくてもいいです。出力先はsrc2フォルダとしてください。                                                              
+
+⏺ Recalled 1 memory, searched for 6 patterns, read 12 files (ctrl+o to expand)
+
+⏺ Entered plan mode
+  Claude is now exploring and designing an implementation approach.
+
+⏺ COBOLファイルを十分に読めたので、プランファイルを作成します。
+
+⏺ Updated plan
+  ⎿  /plan to preview
+
+⏺ User approved Claude's plan
+  ⎿  Plan saved to: ~/.claude/plans/polymorphic-conjuring-river.md · /plan to edit
+     COBOL → Java 変換プラン (src2/)
+
+     Context
+
+     sample1.cbl と依存ファイル (sub1.cbl, copy1.cpy) が前回変換時 (src/) から変更されている。
+     差分を反映した新たな Java 変換を src2/cobol/sample1/ に出力する。
+
+     ---
+     変更差分の分析
+
+     sample1.cbl の主な変更点
+
+     ┌─────────────────────────────┬─────────────────────────────────────────────────────────────────────────┐
+     │          変更箇所           │                                  内容                                   │
+     ├─────────────────────────────┼─────────────────────────────────────────────────────────────────────────┤
+     │ ENVIRONMENT DIVISION 追加   │ SELECT OUT-FILE ASSIGN TO "OUTFILE.TXT" ORGANIZATION IS LINE SEQUENTIAL │
+     ├─────────────────────────────┼─────────────────────────────────────────────────────────────────────────┤
+     │ FILE SECTION 追加           │ FD OUT-FILE / 01 OUT-FILE-REC PIC X(99)                                 │
+     ├─────────────────────────────┼─────────────────────────────────────────────────────────────────────────┤
+     │ HOGE-DATE の DD 変更        │ PIC X(2) → PIC 9(2) COMP-3 (packed decimal)                             │
+     ├─────────────────────────────┼─────────────────────────────────────────────────────────────────────────┤
+     │ PROCEDURE DIVISION          │ PERFORM OUT-FILE-SEC を追加                                             │
+     ├─────────────────────────────┼─────────────────────────────────────────────────────────────────────────┤
+     │ OUT-FILE-SEC セクション追加 │ OPEN / MOVE / WRITE / CLOSE のファイル出力処理                          │
+     └─────────────────────────────┴─────────────────────────────────────────────────────────────────────────┘
+
+     sub1.cbl の主な変更点
+
+     ┌───────────────────────┬─────────────────────────────────────────────────────────────┐
+     │       変更箇所        │                            内容                             │
+     ├───────────────────────┼─────────────────────────────────────────────────────────────┤
+     │ 01 SUB-WORK-AREA 追加 │ 03 SUB-WORK-DATA PIC X(10) (ローカル作業域)                 │
+     ├───────────────────────┼─────────────────────────────────────────────────────────────┤
+     │ PROCEDURE DIVISION    │ MOVE前後のDISPLAY + MOVE "SUB-DATA" TO SUB-WORK-DATA を追加 │
+     └───────────────────────┴─────────────────────────────────────────────────────────────┘
+
+     ---
+     作成ファイル一覧 (src2/cobol/sample1/)
+
+     ┌────────────────────┬────────────────┬──────────────────────────────────────┐
+     │      ファイル      │    変更有無    │                 概要                 │
+     ├────────────────────┼────────────────┼──────────────────────────────────────┤
+     │ CobolUtil.java     │ なし（コピー） │ MOVE/DISPLAY ユーティリティ          │
+     ├────────────────────┼────────────────┼──────────────────────────────────────┤
+     │ ExternalArea.java  │ なし（コピー） │ IS EXTERNAL シングルトン             │
+     ├────────────────────┼────────────────┼──────────────────────────────────────┤
+     │ WorkArea1.java     │ なし（コピー） │ WORK-AREA1 + REDEFINES               │
+     ├────────────────────┼────────────────┼──────────────────────────────────────┤
+     │ WorkArea2.java     │ なし（コピー） │ WORK-AREA2（HogeDateを保持）         │
+     ├────────────────────┼────────────────┼──────────────────────────────────────┤
+     │ CopyWorkArea1.java │ なし（コピー） │ COPY展開: COPY-WORK-AREA1            │
+     ├────────────────────┼────────────────┼──────────────────────────────────────┤
+     │ CopyWorkArea2.java │ なし（コピー） │ COPY展開: COPY-WORK-AREA2 (BAR-STR*) │
+     ├────────────────────┼────────────────┼──────────────────────────────────────┤
+     │ HogeDate.java      │ 変更           │ DD が PIC 9(2) COMP-3 に変更         │
+     ├────────────────────┼────────────────┼──────────────────────────────────────┤
+     │ Sub1.java          │ 変更           │ SUB-WORK-AREA ローカル作業域を追加   │
+     ├────────────────────┼────────────────┼──────────────────────────────────────┤
+     │ Sample1.java       │ 変更           │ ファイル出力 (OUT-FILE-SEC) を追加   │
+     └────────────────────┴────────────────┴──────────────────────────────────────┘
+
+     ---
+     詳細設計
+
+     1. HogeDate.java — DD の COMP-3 対応
+
+     COBOL 定義:
+     05 DD PIC 9(2) COMP-3.
+
+     Java 表現方針:
+     - dd を int 型で保持（COMP-3 の数値セマンティクスを再現）
+     - getDd(): String.format("%02d", dd) で2桁ゼロパディング文字列を返す
+     - setDd(String v): 文字列を trim して parseInt → int に変換
+     - toCobolString(): yyyy + mm + getDd() （8文字の表示用文字列）
+     - fromCobolString(String s): 8文字文字列から s.substring(6,8) をパースして dd に代入
+
+     注記: 実際の COBOL では COMP-3 PIC 9(2) は1バイト(packed decimal)のため
+     HOGE-DATE のバイト長は7。集団項目間の MOVE はバイト転送だが、
+     Java シミュレーションでは表示用8文字表現で統一し、この点をコメントに明示する。
+
+     MOVE CORR の挙動変化:
+     - 旧: DD of YYYYMMDD-R (PIC X(2)) → DD of HOGE-DATE (PIC X(2)) … 文字列コピー
+     - 新: DD of YYYYMMDD-R (PIC X(2)) → DD of HOGE-DATE (PIC 9(2) COMP-3) … setDd() を呼ぶことで数値変換
+
+     2. Sub1.java — SUB-WORK-AREA の追加
+
+     // 01 SUB-WORK-AREA — WORKING-STORAGE（プログラム固有）
+     private static String subWorkData = "          ";  // 03 SUB-WORK-DATA PIC X(10)
+
+     call() メソッドに以下を追加（MOVE "2027" TO YYYY の後）:
+     // DISPLAY "  SUB1: SUB-WORK-DATA: " SUB-WORK-DATA
+     CobolUtil.display("  SUB1: SUB-WORK-DATA: ", subWorkData);
+     // MOVE "SUB-DATA" TO SUB-WORK-DATA
+     subWorkData = CobolUtil.move("SUB-DATA", 10);
+     // DISPLAY "  SUB1: SUB-WORK-DATA: " SUB-WORK-DATA
+     CobolUtil.display("  SUB1: SUB-WORK-DATA: ", subWorkData);
+
+     3. Sample1.java — ファイル出力の追加
+
+     FILE SECTION のフィールド:
+     // FILE SECTION
+     // FD OUT-FILE / 01 OUT-FILE-REC PIC X(99)
+     private String outFileRec = CobolUtil.move("", 99);
+
+     outFileSec() メソッド:
+     private void outFileSec() {
+         // DISPLAY "OUT-FILE: " WORK-AREA2
+         CobolUtil.display("OUT-FILE: ", workArea2.toCobolString());
+         // OPEN OUTPUT OUT-FILE / MOVE WORK-AREA2 TO OUT-FILE-REC / WRITE / CLOSE
+         outFileRec = CobolUtil.move(workArea2.toCobolString(), 99);
+         try (java.io.PrintWriter pw = new java.io.PrintWriter(
+                  new java.io.FileWriter("OUTFILE.TXT"))) {
+             pw.println(outFileRec);
+         } catch (java.io.IOException e) {
+             throw new RuntimeException("FILE OPEN/WRITE error: OUT-FILE", e);
+         }
+     }
+
+     run() に追加:
+     // PERFORM OUT-FILE-SEC  ← PERFORM COPY-SEC の直後に追加
+     outFileSec();
+
+     ---
+     動作確認方法
+
+     # src2 直下でコンパイル
+     find src2 -name "*.java" | xargs javac -d out2/
+
+     # 実行
+     java -cp out2 cobol.sample1.Sample1
+
+     # ファイル出力の確認
+     cat OUTFILE.TXT
+
+     期待される DISPLAY 出力の追加部分:
+     OUT-FILE: 2026010       ← WORK-AREA2 の COMP-3 変更を反映した7byte相当の表示
+       SUB1: SUB-WORK-DATA:            ← MOVE 前（初期スペース）
+       SUB1: SUB-WORK-DATA: SUB-DATA   ← MOVE 後
+     DD: 01
+
+⏺ 実装を開始します。まずディレクトリを作成し、ファイルを書いていきます。
+
+⏺ Bash(mkdir -p /Users/learn/workspace/cobol-example/src2/cobol/sample1)
+  ⎿  Done
+
+⏺ 変更なしの6ファイルを並行して書きます。
+
+⏺ Write(src2/cobol/sample1/CobolUtil.java)
+  ⎿  Wrote 32 lines to src2/cobol/sample1/CobolUtil.java
+      1 package cobol.sample1;
+      2
+      3 /**
+      4  * COBOL ユーティリティ。
+      5  * PIC X(n) の固定幅文字列操作と DISPLAY 命令を提供する。
+      6  */
+      7 public final class CobolUtil {
+      8
+      9     private CobolUtil() {}
+     … +22 lines (ctrl+o to expand)
+
+⏺ Write(src2/cobol/sample1/ExternalArea.java)
+  ⎿  Wrote 30 lines to src2/cobol/sample1/ExternalArea.java
+       1 package cobol.sample1;
+       2
+       3 /**
+       4  * COBOL の IS EXTERNAL データ領域を表す静的シングルトン。
+       5  *
+       6  * SAMPLE1 と SUB1 の両プログラムが同一インスタンスを参照することで、
+       7  * COBOL の IS EXTERNAL による共有セマンティクスを再現する。
+       8  *
+       9  * COBOL 元定義:
+      10  *   01 EXT-WORK-AREA IS EXTERNAL.
+     … +20 lines (ctrl+o to expand)
+
+⏺ Write(src2/cobol/sample1/WorkArea1.java)
+  ⎿  Wrote 80 lines to src2/cobol/sample1/WorkArea1.java
+       1 package cobol.sample1;
+       2
+       3 /**
+       4  * COBOL の 01 WORK-AREA1 を表す。
+       5  *
+       6  * YYYYMMDD（PIC X(8)）と YYYYMMDD-R（REDEFINES YYYYMMDD）が同じメモリを共有する
+       7  * REDEFINES 構造を、8要素の char[] バッキングストアで再現する。
+       8  * どちらのビューからの書き込みも同じ buf[] に反映される。
+       9  *
+      10  * COBOL 元定義:
+     … +70 lines (ctrl+o to expand)
+
+⏺ Write(src2/cobol/sample1/WorkArea2.java)
+  ⎿  Wrote 27 lines to src2/cobol/sample1/WorkArea2.java
+       1 package cobol.sample1;
+       2
+       3 /**
+       4  * COBOL の 01 WORK-AREA2 を表す。
+       5  *
+       6  * COBOL 元定義:
+       7  *   01 WORK-AREA2.
+       8  *     03 HOGE-DATE.
+       9  *       05 YYYY PIC X(4).
+      10  *       05 MM   PIC X(2).
+     … +17 lines (ctrl+o to expand)
+
+⏺ Write(src2/cobol/sample1/CopyWorkArea1.java)
+  ⎿  Wrote 22 lines to src2/cobol/sample1/CopyWorkArea1.java
+       1 package cobol.sample1;
+       2
+       3 /**
+       4  * COPY "COPY1" の展開: 01 COPY-WORK-AREA1。
+       5  *
+       6  * COBOL 元定義（copy1.cpy）:
+       7  *   01 COPY-WORK-AREA1.
+       8  *     03 COPY-WORK-DATA PIC X(10).
+       9  */
+      10 public class CopyWorkArea1 {
+     … +12 lines (ctrl+o to expand)
+
+⏺ Write(src2/cobol/sample1/CopyWorkArea2.java)
+  ⎿  Wrote 32 lines to src2/cobol/sample1/CopyWorkArea2.java
+       1 package cobol.sample1;
+       2
+       3 /**
+       4  * COPY "COPY1" REPLACING LEADING ==FOO== BY ==BAR== の展開: 01 COPY-WORK-AREA2。
+       5  *
+       6  * COBOL 元定義（copy1.cpy）では FOO-STR1/2/3 だが、
+       7  * REPLACING 句により BAR-STR1/2/3 に置換されている。
+       8  *
+       9  * COBOL 元定義（copy1.cpy）:
+      10  *   01 COPY-WORK-AREA2.
+     … +22 lines (ctrl+o to expand)
+
+⏺ 次に変更のある3ファイルを書きます。
+
+⏺ Write(src2/cobol/sample1/HogeDate.java)
+  ⎿  Wrote 77 lines to src2/cobol/sample1/HogeDate.java
+       1 package cobol.sample1;
+       2
+       3 /**
+       4  * COBOL の日付グループ項目を表す。
+       5  *
+       6  * SAMPLE1 の 03 HOGE-DATE（01 WORK-AREA2 内）と
+       7  * SUB1 の 01 PARAM-DATE（LINKAGE SECTION）は同一構造のため共通クラスとして定義。
+       8  *
+       9  * COBOL 元定義:
+      10  *   03 HOGE-DATE.
+     … +67 lines (ctrl+o to expand)
+
+⏺ Write(src2/cobol/sample1/Sub1.java)
+  ⎿  Wrote 63 lines to src2/cobol/sample1/Sub1.java
+       1 package cobol.sample1;
+       2
+       3 /**
+       4  * COBOL サブプログラム SUB1 に相当するクラス。
+       5  *
+       6  * COBOL 元定義（sub1.cbl）:
+       7  *   PROGRAM-ID. SUB1.
+       8  *   WORKING-STORAGE SECTION.
+       9  *     01 EXT-WORK-AREA IS EXTERNAL.
+      10  *       03 EXT-WORK-DATA PIC X(10).
+     … +53 lines (ctrl+o to expand)
+
+⏺ Write(src2/cobol/sample1/Sample1.java)
+  ⎿  Wrote 215 lines to src2/cobol/sample1/Sample1.java
+       1 package cobol.sample1;
+       2
+       3 /**
+       4  * COBOL メインプログラム SAMPLE1 に相当するクラス。
+       5  *
+       6  * 各 COBOL SECTION を private メソッドとして実装し、
+       7  * PERFORM 文の呼び出し順序を run() メソッドで再現する。
+       8  *
+       9  * COBOL 元定義（sample1.cbl）:
+      10  *   PROGRAM-ID. SAMPLE1.
+     … +205 lines (ctrl+o to expand)
+
+⏺ 全ファイルを作成しました。コンパイルして動作確認します。
+
+⏺ Bash(mkdir -p /Users/learn/workspace/cobol-example/out2 && find /Users/learn/workspace/cobol-example/src2 -name "*.java" | xargs javac -d
+      /Users/learn/workspace/cobo…)
+  ⎿  (No output)
+
+⏺ Bash(java -cp out2 cobol.sample1.Sample1 && echo "---OUTFILE.TXT---" && cat OUTFILE.TXT)
+  ⎿  WORK-AREA2: 20260102
+     YYYYMMDD: 20260302
+     HOGE-DATE: 20260302
+     … +21 lines (ctrl+o to expand)
+
+⏺ コンパイル・実行ともに成功しました。メモリを保存します。
+
+⏺ Wrote 1 memory (ctrl+o to expand)
+
+⏺ 実装完了です。以下が作成内容のまとめです。
+
+  ---
+  作成結果 (src2/cobol/sample1/)
+
+  変更なし（src/ からそのまま移植）
+
+  - CobolUtil.java — MOVE/DISPLAY ユーティリティ
+  - ExternalArea.java — IS EXTERNAL シングルトン
+  - WorkArea1.java — WORK-AREA1 + REDEFINES
+  - WorkArea2.java — WORK-AREA2
+  - CopyWorkArea1.java / CopyWorkArea2.java — COPY展開クラス
+
+  変更あり
+
+  HogeDate.java — DD の型変更 (PIC X(2) → PIC 9(2) COMP-3)
+  - dd を int で保持、getDd() は String.format("%02d", dd) でゼロパディング
+  - setDd(String) は parseInt で数値変換
+  - MOVE CORR の際に自動的に数値変換が行われる
+  - COMP-3 は実COBOLで1バイトなのでグループ項目の物理長は7バイトだが、Javaシミュレーションでは表示用8文字表現に統一（コメントで明記）
+
+  Sub1.java — SUB-WORK-AREA の追加
+  - private static String subWorkData を追加（ローカル作業域）
+  - MOVE前後の DISPLAY と MOVE "SUB-DATA" を実装
+
+  Sample1.java — ファイル出力 (OUT-FILE-SEC) の追加
+  - outFileRec フィールド (PIC X(99))
+  - outFileSec() メソッド: PrintWriter で OUTFILE.TXT に1レコード書き出し
+  - run() に PERFORM OUT-FILE-SEC を追加
+
+✻ Worked for 7m 11s
